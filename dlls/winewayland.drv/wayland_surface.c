@@ -64,6 +64,8 @@ static void xdg_surface_handle_configure(void *private, struct xdg_surface *xdg_
 
     if (should_post) NtUserPostMessage(hwnd, WM_WAYLAND_CONFIGURE, 0, 0);
 
+    if (should_post) NtUserPostMessage(hwnd, WM_WAYLAND_CONFIGURE, 0, 0);
+
     /* Flush the window surface in case there is content that we weren't
      * able to flush before due to the lack of the initial configure. */
     if (initial_configure)
