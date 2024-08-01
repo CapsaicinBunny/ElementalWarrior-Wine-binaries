@@ -24,6 +24,6 @@ WINE_DEFAULT_DEBUG_CHANNEL(dxcore);
 
 HRESULT WINAPI DXCoreCreateAdapterFactory( REFIID riid, void **ppv )
 {
-    FIXME( "riid %s, ppv %p stub!\n", debugstr_guid(riid), ppv );
-    return E_NOINTERFACE;
+    TRACE( "riid %s, ppv %p\n", debugstr_guid(riid), ppv );
+    return dxcore_factory_create(riid, ppv);
 }
