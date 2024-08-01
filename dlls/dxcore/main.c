@@ -16,8 +16,9 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "dxcore.h"
-#include "wine/debug.h"
+#define DXCORE_INIT_GUID
+#include "private.h"
+
 
 WINE_DEFAULT_DEBUG_CHANNEL(dxcore);
 
