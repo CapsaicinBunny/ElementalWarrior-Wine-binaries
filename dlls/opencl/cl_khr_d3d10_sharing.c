@@ -15,39 +15,65 @@ WINE_DEFAULT_DEBUG_CHANNEL(opencl);
 cl_int compare_dxgi_cl_device(IUnknown* d3d_adapter, cl_device_id cl_device, cl_bool *result) {
     cl_int err;
     IWineDXGIAdapter *this;
-    DWORD cl_vid;
-    struct wine_dxgi_adapter_info dx_info;
+    DXGI_ADAPTER_DESC info;
+    WCHAR *cl_name;
     struct clGetDeviceInfo_params params;
 
-    /*
-    So it turns out that the ROCM opencl driver sets the name to a weird codename,
-    and does not support cl_khr_device_uuid, so we can't use those to confirm the devices are the same.
-    There's also some funkiness with clSetEventCallback and/or clFlush.
-    */
-    if (FAILED(IUnknown_QueryInterface(d3d_adapter, &IID_IWineDXGIAdapter, (void **)&this))) {
+    // note: it is possible to compare the UUID if the device supports cl_khr_device_uuid
+    // and I would like to do that, but I also want built in DXVK support :)
+    // also SLI isn't really supported anymore so probs not relevant
+    if (FAILED(IUnknown_QueryInterface(d3d_adapter, &IID_IDXGIAdapter, (void **)&this))) {
         ERR("Not a IDXGIAdapter %p.\n", d3d_adapter);
         return CL_DEVICE_NOT_FOUND;
     }
 
-    if (FAILED(IWineDXGIAdapter_get_adapter_info(this, &dx_info))) {
+    if (FAILED(IDXGIAdapter_GetDesc(this, &info))) {
         ERR("Could not get adapter info %p.\n", this);
         IUnknown_Release(this);
         return CL_DEVICE_NOT_FOUND;
     }
     IUnknown_Release(this);
 
+
+    uint32_t CL_DEVICE_BOARD_NAME_AMD = 0x4038;
     params.device = cl_device;
-    params.param_name = CL_DEVICE_VENDOR_ID;
-    params.param_value = &cl_vid;
-    params.param_value_size = sizeof(cl_vid);
-    params.param_value_size_ret = NULL;
+    params.param_name = CL_DEVICE_BOARD_NAME_AMD;
+    params.param_value = NULL;
+    params.param_value_size = 0;
+    params.param_value_size_ret = &params.param_value_size;
     if ((err = OPENCL_CALL( clGetDeviceInfo, &params ))) {
-        ERR("Error getting device uuid of %p; %d.\n", cl_device, err);
+        ERR("Error getting device name of %p; %d.\n", cl_device, err);
+        err = 0;
+        params.param_name = CL_DEVICE_NAME;
+        if((err = OPENCL_CALL( clGetDeviceInfo, &params ))) {
+            ERR("Error getting device name of %p; %d.\n", cl_device, err);
+            return err;
+        }
+    }
+
+    if (!(params.param_value = calloc(params.param_value_size+1, 1)))
+        err = CL_OUT_OF_HOST_MEMORY;
+    if (!(cl_name = calloc(params.param_value_size+1, sizeof(WCHAR))))
+        err = CL_OUT_OF_HOST_MEMORY;
+
+    if (err) {
+        if (params.param_value) free(params.param_value);
+        if (cl_name) free(params.param_value);
         return err;
     }
 
-    *result = cl_vid == dx_info.vendor_id;
-    TRACE("cl_vid %ld, dx_uuid %ld, samedevice %i\n", cl_vid, dx_info.vendor_id, *result);
+    if ((err = OPENCL_CALL( clGetDeviceInfo, &params ))) {
+        ERR("Error getting device name of %p; %d.\n", cl_device, err);
+        return err;
+    }
+
+    mbstowcs(cl_name, params.param_value, params.param_value_size);
+    free(params.param_value);
+
+    TRACE("cl_name %s, from %lld, d3d %s.\n", wine_dbgstr_w(cl_name), params.param_value_size, wine_dbgstr_w(info.Description));
+    *result = (wcscmp(cl_name, info.Description) == 0);
+
+    free(cl_name);
 
     return CL_SUCCESS;
 }
