@@ -4,6 +4,7 @@
 #include "opencl_types.h"
 #include "unixlib.h"
 #include "extensions.h"
+#include "ntuser.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(opencl);
 
@@ -580,16 +581,6 @@ cl_int WINAPI clRetainSampler( cl_sampler sampler )
     return OPENCL_CALL( clRetainSampler, &params );
 }
 
-cl_int WINAPI clSetEventCallback( cl_event event, cl_int command_exec_callback_type, void (WINAPI* pfn_notify)(cl_event event, cl_int event_command_status, void *user_data), void* user_data )
-{
-    cl_int ret;
-    struct clSetEventCallback_params params = { event, command_exec_callback_type, pfn_notify, user_data };
-    TRACE( "(%p, %d, %p, %p)\n", event, command_exec_callback_type, pfn_notify, user_data );
-    ret = OPENCL_CALL( clSetEventCallback, &params );
-    params.pfn_notify(event, command_exec_callback_type, user_data);
-    return ret;
-}
-
 cl_int WINAPI clSetKernelArg( cl_kernel kernel, cl_uint arg_index, size_t arg_size, const void* arg_value )
 {
     struct clSetKernelArg_params params = { kernel, arg_index, arg_size, arg_value };
@@ -630,6 +621,43 @@ cl_int WINAPI clWaitForEvents( cl_uint num_events, const cl_event* event_list )
     struct clWaitForEvents_params params = { num_events, event_list };
     TRACE( "(%u, %p)\n", num_events, event_list );
     return OPENCL_CALL( clWaitForEvents, &params );
+}
+
+static DWORD WINAPI event_callback(void *args) {
+    cl_int ret;
+    struct clSetEventCallback_params *params = args;
+    FIXME("Using windows thread to wait for callback\n");
+    TRACE( "(%p, %d, %p,  %p)\n", params->event, params->command_exec_callback_type, params->pfn_notify, params->user_data );
+    ret = clWaitForEvents((cl_uint)1, &params->event);
+    if(ret) {
+        ERR("Failed to wait for events %x\n", ret);
+    } else {
+        params->pfn_notify(params->event, params->command_exec_callback_type, params->user_data);
+    }
+    free(args);
+}
+
+cl_int WINAPI clSetEventCallback( cl_event event, cl_int command_exec_callback_type, void (WINAPI* pfn_notify)(cl_event event, cl_int event_command_status, void *user_data), void* user_data )
+{
+    HANDLE handle;
+    struct clSetEventCallback_params params = { event, command_exec_callback_type, pfn_notify, user_data };
+    struct clSetEventCallback_params *params2 = malloc(sizeof(struct clSetEventCallback_params));
+    params2->command_exec_callback_type = command_exec_callback_type;
+    params2->event = event;
+    params2->pfn_notify = pfn_notify;
+    params2->user_data = user_data;
+
+    // clWaitForEvents/
+
+    // RtlCreateUserThread(GetCurrentProcess(), NULL, FALSE, 0, 0, 0,
+                                //  event_callback, &params, &handle, NULL);
+    // NtCreateThreadEx(&handle, THREAD_ALL_ACCESS, NULL, NtCurrentProcess(), event_callback, &params, 0, 0, 0, 0, NULL);
+    CreateThread(NULL, 0, event_callback, params2, 0, NULL);
+    TRACE( "(%p, %d, %p,  %p)\n", event, command_exec_callback_type, pfn_notify, user_data );
+    return CL_SUCCESS;
+    // ret = OPENCL_CALL( clSetEventCallback, &params );
+    // params.pfn_notify(event, command_exec_callback_type, user_data);
+    // return ret;
 }
 
 BOOL extension_is_supported( const char *name, size_t len )
