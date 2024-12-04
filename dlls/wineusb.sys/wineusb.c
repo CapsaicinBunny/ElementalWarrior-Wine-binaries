@@ -556,7 +556,6 @@ static NTSTATUS usb_submit_urb(struct usb_device *device, IRP *irp)
         case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
         case URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE:
         case URB_FUNCTION_SELECT_CONFIGURATION:
-        case URB_FUNCTION_VENDOR_DEVICE:
         case URB_FUNCTION_VENDOR_INTERFACE:
         case URB_FUNCTION_VENDOR_ENDPOINT:
         {
@@ -588,7 +587,6 @@ static NTSTATUS usb_submit_urb(struct usb_device *device, IRP *irp)
                     break;
                 }
 
-                case URB_FUNCTION_VENDOR_DEVICE:
                 case URB_FUNCTION_VENDOR_INTERFACE:
                 case URB_FUNCTION_VENDOR_ENDPOINT:
                 {
