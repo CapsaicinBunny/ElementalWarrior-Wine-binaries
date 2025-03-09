@@ -6,9 +6,10 @@ on:
       name:
         required: true
         type: string
-
+  workflow_dispatch:
+  
 jobs:
-  proton:
+  wine:
     name: ${{ inputs.name }}
     runs-on: ubuntu-latest
     steps:
@@ -43,3 +44,10 @@ jobs:
       with:
         name: ${{ inputs.name }}.sha512sum
         path: ./build/${{ inputs.name }}.sha512sum
+
+
+
+
+
+
+
